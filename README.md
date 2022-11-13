@@ -13,20 +13,20 @@ R >= 4.2.1
 
 ### R packages
 
-ComplexHeatmap
-dplyr
-DT
-formattable
-GeomxTools
-ggplot2
-ggrepel
-plotly
-preprocessCore
-shiny
-shinythemes
-shinycssloaders
-shinyBS
-tidyr
+ComplexHeatmap\
+dplyr\
+DT\
+formattable\
+GeomxTools\
+ggplot2\
+ggrepel\
+plotly\
+preprocessCore\
+shiny\
+shinythemes\
+shinycssloaders\
+shinyBS\
+tidyr\
 
 ## Installation
 
