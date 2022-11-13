@@ -9,7 +9,7 @@ This app was designed to take the output from geomxngspipeline (.dcc files) alon
 
 ### R version
 
-R >= 4.1.2 
+R >= 4.2.1 
 
 ### R packages
 
