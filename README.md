@@ -32,6 +32,8 @@ tidyr\
 
 Once the correct R version and R packages have been installed, clone this repository.
 
+```git clone https://github.com/OxfordCMS/OCMS_Shiny_Geomx.git```
+
 ## Running the app
 
 To run the app, start R/RStudio and run the app with:
