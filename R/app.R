@@ -12,14 +12,20 @@ library(preprocessCore)
 library(ggrepel)
 
 # TEMPORARY DATA UNTIL READING IN FILE WORKING
-geomx_dat <- readRDS("../../data/hca_geomx.rds")
-geomx_dat@analyte <- "RNA"
-dat <- as.data.frame(sData(geomx_dat))
-dat$Sample_ID <- rownames(dat)
+#geomx_dat <- readRDS("../data/hca_geomx.rds")
+#geomx_dat@analyte <- "RNA"
+#dat <- as.data.frame(sData(geomx_dat))
+#dat$Sample_ID <- rownames(dat)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("cosmo"),
 
+                
+#    tags$style(type="text/css",
+#               ".shiny-output-error { visibility: hidden; }",
+#               ".shiny-output-error:before { visibility: hidden; }"
+#    ),
+    
     # Application title
     titlePanel("shiny geomx"),
                 
@@ -28,7 +34,7 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
             sidebarLayout(
                 sidebarPanel("Import geomx .rds file", position="left",
                               div(id="input_div",
-                              fileInput("rds", "", multiple=FALSE),
+                              fileInput("rds", "", multiple=FALSE, accept=c(".rds", ".Rds", ".RDS")),
                               bsTooltip("input_div", "Input file that is .Rds file of stored NanoStringGeoMxSet", placement = "bottom", trigger = "hover",
                                        options = NULL)
                               )
@@ -220,12 +226,29 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
 options(shiny.maxRequestSize=50*1024^2)
 server <- function(input, output) {
   
+    # input .rds file
+    geomx_dat <- reactive({
+      filename <- input$rds
+      if (is.null(filename)){
+        return()
+      }
+      geomx_dat <- readRDS(filename$datapath)
+      geomx_dat@analyte <- "RNA"
+      geomx_dat
+    })
+
+      
     ###############################################
     # Summary stats  
     ###############################################
     # Summary table
     summary_df <- reactive({
-        dat <- as.data.frame(sData(geomx_dat))
+        if (is.null(input$rds)){
+          return()
+        }
+        dat <- as.data.frame(sData(geomx_dat()))
+        dat$Sample_ID <- rownames(dat)
+        dat$Sample_ID <- rownames(dat)
         summary_data <- data.frame("nsegments" = nrow(dat),
                                    "ave_read_count" = round(mean(dat$Raw), digits = 0),
                                    "ave_deduplicated_reads" = round(mean(dat$DeduplicatedReads), digits=0))
@@ -242,6 +265,11 @@ server <- function(input, output) {
     
     # read summary plot
     summary_plot <- reactive({
+        if (is.null(input$rds)){
+          return()
+        }
+        dat <- as.data.frame(sData(geomx_dat()))
+        dat$Sample_ID <- rownames(dat)
         dat.m <- dat[,c("Sample_ID", "Raw", "DeduplicatedReads")]
         dat.m <- tidyr::pivot_longer(!Sample_ID,
                                      values_to="count",
@@ -268,7 +296,7 @@ server <- function(input, output) {
     # Sample selection
     ###############################################
     sample_table_select <- reactive({
-      pData(geomx_dat) %>% select(file, slide.name, roi, segment)
+      pData(geomx_dat()) %>% select(file, slide.name, roi, segment)
     })
     
     output$selected_samples <- DT::renderDataTable(server = FALSE, {
@@ -297,9 +325,9 @@ server <- function(input, output) {
       geomx_dat_filtered <- reactive({
       to_keep <- input$selected_samples_rows_selected
       if (is.null(to_keep)){
-        geomx_dat_filtered <- geomx_dat}
+        geomx_dat_filtered <- geomx_dat()}
       else{
-          geomx_dat_filtered <- geomx_dat[,to_keep]
+          geomx_dat_filtered <- geomx_dat()[,to_keep]
       }
       geomx_dat_filtered
     })
@@ -825,7 +853,7 @@ plot_normalized_heatmap <- eventReactive(input$search_genes_to_view, {
     
   h1 <- Heatmap(raw, top_annotation = col_annotation, name="Raw data", column_labels=col_labels)
   h2 <- Heatmap(norm, top_annotation = col_annotation, name = "Normalized data", column_labels=col_labels)
-  h3 <- Heatmap(norm_scaled, top_annotation = col_annotation, name = "Normalized + scaled data", column_lbels=col_labels)
+  h3 <- Heatmap(norm_scaled, top_annotation = col_annotation, name = "Normalized + scaled data", column_labels=col_labels)
   draw(h1 + h2 + h3)
 })
 
