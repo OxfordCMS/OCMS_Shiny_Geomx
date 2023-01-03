@@ -12,7 +12,7 @@ library(preprocessCore)
 library(ggrepel)
 
 # TEMPORARY DATA UNTIL READING IN FILE WORKING
-#geomx_dat <- readRDS("../data/hca_geomx.rds")
+#geomx_dat <- readRDS("~/devel/shiny_geomx/data/hca_geomx.rds")
 #geomx_dat@analyte <- "RNA"
 #dat <- as.data.frame(sData(geomx_dat))
 #dat$Sample_ID <- rownames(dat)
@@ -58,6 +58,8 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                    ),
                    mainPanel(h6("Select samples from table below"),
                              DT::dataTableOutput('selected_samples') %>% withSpinner(),
+                             plotlyOutput("scatter_count_area") %>% withSpinner(),
+                             plotlyOutput("scatter_count_area_log") %>% withSpinner(),
                    ),
                 )
         ),
@@ -147,9 +149,16 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
         tabPanel("Probe QC", fluid = TRUE,
                  sidebarLayout(
                    sidebarPanel("Probe QC", position="left",
+                                div(id="probe_qc_div",
                                 radioButtons("local_removal", "Perform local removal",
                                              choices = c("Yes", "No"),
-                                             selected="No")
+                                             selected="No"),
+                                bsTooltip("probe_qc_div",
+                                          "Local removal will remove probes within segments in which they perform poorly and leave others untouched. WARNING: Not implemented",
+                                           placement = "bottom",
+                                           trigger = "hover",
+                                           options = NULL)
+                                ),
                    ),
                    mainPanel(h6("Probe QC is performed on negative control probes. They are used to determine
                                 the background in subsequent processing and so at this point if they are outliers
@@ -165,13 +174,50 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
         tabPanel("Gene-level QC", fluid = TRUE,
                  sidebarLayout(
                    sidebarPanel("Limit of quantification", position="left",
+                                
+                                div(id="std_div",
                                 numericInput("n_std_deviations", "Number of SDs above neg mean", 2),
+                                bsTooltip("std_div",
+                                          "Number of standard deviations above the negative control probes that amn endogenous probe has to be in order to be called as expressed",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),
+                                div(id="min_cutoff_div",
                                 numericInput("min_cutoff", "Minimum cutoff", 2),
+                                bsTooltip("min_cutoff_div",
+                                          "This is a bit of a catch for probes that pass the Std cutoff but are still too low to be considered useful. Leave as 2",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),
+                                div(id="filter_threshold_div",
                                 numericInput("filter_threshold", "% gene detection cut-off to remove segment", 10),
+                                bsTooltip("filter_threshold_div",
+                                          "Based on the above parameters what % of genes should represent a high quality segment? Segments below this threshold are removed",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),      
                                 actionButton("filter_segments", "Filter segments"),
+                                
+                                div(id="goi_div",
                                 textAreaInput("goi_list", "Gene detection rates (paste gene list)"),
+                                bsTooltip("goi_div",
+                                          "Type or paste a list of genes (symbols) to retrieve the % of segments they are detected in. Must be a sinlge column list with no seperators",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),
                                 actionButton("search_genes", "Search"),
+                                div(id="gene_filter_div",
                                 numericInput("gene_filter_threshold", "Keep gene if detected in more than this % of segments", 10),
+                                bsTooltip("gene_filter_div",
+                                          "Filter genes out of the dataset if they are not present in at least this % of segments",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),
                                 actionButton("filter_genes", "Filter genes")
                    ),
                    mainPanel(h6("The geometric mean is taken for probes that belong to the same gene and a single
@@ -190,10 +236,17 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
         tabPanel("Normalization", fluid = TRUE,
                  sidebarLayout(
                    sidebarPanel("Normalization", position="left",
+                                div(id="normalisation_div",
                                 radioButtons("norm_method",
                                              "Choose method",
                                              choices=c("Quantile"),
                                              selected="Quantile"),
+                                bsTooltip("normalisation_div",
+                                          "Choose normalisation method",
+                                          placement = "bottom",
+                                          trigger = "hover",
+                                          options = NULL)
+                                ),
                                 actionButton("normalize", "Normalize"),
                                 textAreaInput("genes_to_view", "Gene expression"),
                                 actionButton("search_genes_to_view", "Search"),
@@ -212,12 +265,12 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                              plotOutput("postnorm_distribution") %>% withSpinner(),
                              plotOutput("neg_vs_pos_plot") %>% withSpinner(),
                              h6("PCA coloured by segment - post-normalization"),
-                             plotOutput("postnorm_pca") %>% withSpinner(),
+                             plotlyOutput("postnorm_pca") %>% withSpinner(),
                              h6("Expression of selected genes of interest are shown in a heatmap below"),
                              plotOutput("genes_to_view_heatmap")
                                                           
                    ),
-                 )
+                   )
         )
     )
 )
@@ -309,6 +362,47 @@ server <- function(input, output) {
                     filter = 'top'))
     })    
 
+    scatter_area_counts <- function(dat, logT=FALSE){
+      dat <- sData(dat)
+      dat$label <- paste0(dat$file, ":", dat$slide, ":", dat$roi, ":", dat$segment)
+      if (logT == TRUE){
+        dat$count <- log10(dat$DeduplicatedReads)
+        dat$area_ <- log10(dat$area)
+        labx <- "log10(Area)"
+        laby <- "log10(Count)"
+        }
+      else{
+          dat$count <- dat$DeduplicatedReads
+          dat$area_ <- dat$area
+          labx <- "Area"
+          laby <- "Count"
+      }
+      p <- ggplot(dat, aes(x=area_, y=count, color=label)) +
+        geom_point() +
+        theme_classic() +
+        theme(legend.position="none") +
+        xlab(labx) +
+        ylab(laby)
+      return(plotly::ggplotly(p))
+    }
+    
+    scatterplot_area_counts_raw <- reactive({
+      scatter_area_counts(geomx_dat())
+    })
+    scatterplot_area_counts_log <- reactive({
+      scatter_area_counts(geomx_dat(), logT=TRUE)
+    })
+    
+    output$scatter_count_area <- renderPlotly({
+      scatterplot_area_counts_raw()
+    })
+    
+    output$scatter_count_area_log <- renderPlotly({
+      scatterplot_area_counts_log()
+    })
+    
+    
+    
     ###############################################
     # Segment QC
     ###############################################
@@ -770,9 +864,9 @@ plotPrincipalComponents <- function(pc, metadata, colourby="none", shapeby="none
     pca$shape <- "none"}else{
       pca$shape <- metadata[,shapeby]}#
   
-  if (group == "none"){
-    pca$group <- "none"}else{
-      pca$group <- metadata[,group]}
+  #if (group == "none"){
+  #  pca$group <- "none"}else{
+  #    pca$group <- metadata[,group]}
   
   if (continuous==FALSE){
     pca$condition <- factor(pca$condition, levels=unique(pca$condition))
@@ -793,7 +887,7 @@ plotPrincipalComponents <- function(pc, metadata, colourby="none", shapeby="none
   n <- length(unique(pca$condition))
   colours <- rainbow(n, s=0.7, v=0.6)
   
-  plot1 <- ggplot(pca, aes_string(x=pc1, y=pc2, group="group", colour="condition", shape="shape", label="group"))
+  plot1 <- ggplot(pca, aes_string(x=pc1, y=pc2, colour="condition", shape="shape", label="group"))
   plot2 <- plot1 + geom_point(size=3)
   plot3 <- plot2 + theme_bw() 
   plot4 <- plot3 + xlab(xlabel) + ylab(ylabel)
@@ -802,20 +896,20 @@ plotPrincipalComponents <- function(pc, metadata, colourby="none", shapeby="none
   else{
     plot4 <- plot4 + scale_colour_manual(values=colours)
   }
-  return(plot4) 
+  return(plot4 + theme(legend.position="none")) 
 }
 
 pca_plot <- eventReactive(input$normalize, {
   dat <- normalized()
   all_dat <- filter_genes()
   metadata <- pData(all_dat)
+  metadata$label <- paste0(metadata$file, ":", metadata$slide.name, ":", metadata$roi)
   pc <- runPCA(dat, scale=FALSE)
-  plotPrincipalComponents(pc, metadata, colourby = "segment", group="roi") +
-    geom_text_repel()
+  plotPrincipalComponents(pc, metadata, shapeby="label", colourby = "segment", group="roi")
     
 })
 
-output$postnorm_pca <- renderPlot({
+output$postnorm_pca <- renderPlotly({
   pca_plot()
 })
 
@@ -851,7 +945,7 @@ plot_normalized_heatmap <- eventReactive(input$search_genes_to_view, {
   # segment annotations
   col_annotation <- HeatmapAnnotation(segment = pData(dat)[colnames(raw),]$segment)
     
-  h1 <- Heatmap(raw, top_annotation = col_annotation, name="Raw data", column_labels=col_labels)
+  h1 <- Heatmap(raw, top_annotation = col_annotation, name="Raw data", column_labels=col_labels, column_names_max_height = unit(20, "cm"))
   h2 <- Heatmap(norm, top_annotation = col_annotation, name = "Normalized data", column_labels=col_labels)
   h3 <- Heatmap(norm_scaled, top_annotation = col_annotation, name = "Normalized + scaled data", column_labels=col_labels)
   draw(h1 + h2 + h3)
