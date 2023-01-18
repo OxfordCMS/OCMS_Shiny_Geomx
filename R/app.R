@@ -10,6 +10,7 @@ library(formattable)
 library(ComplexHeatmap)
 library(preprocessCore)
 library(ggrepel)
+library(shinyBS)
 
 # TEMPORARY DATA UNTIL READING IN FILE WORKING
 #geomx_dat <- readRDS("~/devel/shiny_geomx/data/hca_geomx.rds")
@@ -20,7 +21,7 @@ library(ggrepel)
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("cosmo"),
 
-                
+        
 #    tags$style(type="text/css",
 #               ".shiny-output-error { visibility: hidden; }",
 #               ".shiny-output-error:before { visibility: hidden; }"
@@ -267,7 +268,7 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                              h6("PCA coloured by segment - post-normalization"),
                              plotlyOutput("postnorm_pca") %>% withSpinner(),
                              h6("Expression of selected genes of interest are shown in a heatmap below"),
-                             plotOutput("genes_to_view_heatmap")
+                             bsModal("plotModal1", "Heatmap genes of interest", "search_genes_to_view", size = "large", plotOutput("genes_to_view_heatmap", inline = TRUE))
                                                           
                    ),
                    )
@@ -940,6 +941,9 @@ plot_normalized_heatmap <- eventReactive(input$search_genes_to_view, {
   # make colnames slide.name and roi
   pd <- pData(dat)
   roi <- gsub("=", "", gsub('"', '', pd$roi))
+  
+  # column labels informative - if long :(
+  col_labels <- roi
   col_labels <- paste0(colnames(norm_scaled), "-", roi)
     
   # segment annotations
@@ -953,7 +957,7 @@ plot_normalized_heatmap <- eventReactive(input$search_genes_to_view, {
 
 output$genes_to_view_heatmap <- renderPlot({
   plot_normalized_heatmap()
-})
+}, width=1000, height=1000)
 
 ########################################################################
 # Download object or .tsv files
