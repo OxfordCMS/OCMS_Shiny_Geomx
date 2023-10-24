@@ -288,6 +288,8 @@ server <- function(input, output) {
       }
       geomx_dat <- readRDS(filename$datapath)
       geomx_dat@analyte <- "RNA"
+      colnames(pData(geomx_dat)) <- tolower(colnames(pData(geomx_dat)))
+      pData(geomx_dat)$file <- rownames(pData(geomx_dat))
       geomx_dat
     })
 
@@ -556,11 +558,7 @@ server <- function(input, output) {
                                 fData(geomx_dat_probe)[["QCFlags"]][,c("GlobalGrubbsOutlier")] == FALSE)
       }
       else{
-        # TODO: Need to implement this
-        ProbeQCPassed <- subset(geomx_dat_probe,
-                                fData(geomx_dat_probe)[["QCFlags"]][,c("LowProbeRatio")] == FALSE &
-                                fData(geomx_dat_probe)[["QCFlags"]][,c("LocalGrubbsOutlier")] == FALSE)
-          
+        ProbeQCPassed <- geomx_dat_probe
       }
       geomx_filtered_segments_probes <- ProbeQCPassed
       qc_removed <- as.data.frame(dim(ProbeQCPassed))
